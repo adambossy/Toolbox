@@ -100,8 +100,13 @@ if [ -f ~/.aliases_bash ]; then
     . ~/.aliases_bash
 fi
 
-export PATH=$PATH:~/topsicle/build/codemod/src/
+# Local settings that may vary between machines
 
-export EDITOR=emacs
+if [ -f ~/.local ]; then
+    . ~/.local
+fi
+
+export PATH=$PATH:~/toolbox/codemod/src/
+export EDITOR=vim
 
 umask 0002
