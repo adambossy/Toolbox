@@ -44,3 +44,9 @@ alias kill_dj="ps aux | grep -v grep | grep runserver | awk '{ print $2 }' | xar
 
 # Remotely build dev server
 alias build_dev="ssh abossy@dev.topsicle.com 'cd ~/build && hg update && make build'"
+
+# reset hosts file on mac os x
+alias resethosts="dscacheutil -flushcache"
+
+# show me how to tab in the shell (i always forget!)
+alias help="echo 'tab: ctrl+v + ctrl+i'"
