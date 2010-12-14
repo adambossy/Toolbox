@@ -1,4 +1,4 @@
 #!/bin/bash
 
-cp -i .bashrc .aliases_bash .vimrc .hgrc .screenrc ~/
+cp -i .bashrc .aliases_bash .vimrc .hgrc .gitconfig .screenrc ~/
 echo "Done copying hidden config files to $HOME directory."
