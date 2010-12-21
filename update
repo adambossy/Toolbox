@@ -1,3 +1,4 @@
 #!/bin/bash
 
 cp .bashrc .aliases_bash .vimrc .hgrc .screenrc ~/
+. ~/.bashrc ~/.aliases_bash ~/.vimrc ~/.hgrc ~/.screenrc

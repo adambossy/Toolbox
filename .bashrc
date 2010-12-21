@@ -106,7 +106,7 @@ if [ -f ~/.local ]; then
     . ~/.local
 fi
 
-export PATH=$PATH:~/toolbox/codemod/src/
+export PATH=$PATH:~/toolbox/codemod/src/:~/toolbox/scripts/
 export EDITOR=vim
 
 umask 0002
