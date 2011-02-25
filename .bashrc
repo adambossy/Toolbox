@@ -106,6 +106,12 @@ if [ -f ~/.local ]; then
     . ~/.local
 fi
 
+# Load inputrc to allow for smoother tab completion
+
+if [ -f ~/.inputrc ]; then
+    . ~/.inputrc
+fi
+
 export PATH=$PATH:~/toolbox/codemod/src/:~/toolbox/scripts/
 export EDITOR=vim
 
