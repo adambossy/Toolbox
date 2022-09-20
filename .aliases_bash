@@ -14,39 +14,5 @@ alias rm='rm -i'
 
 alias mv='mv -i'
 
-# Apache
-
-alias fr='sudo /etc/init.d/apache2 force-reload'
-
-alias rs='sudo /etc/init.d/apache2 restart'
-
-# Python
-
-alias uninstall='easy_install -mxN'
-
-# Django 
-
-alias runs='python manage.py runserver > /tmp/django-dev-server.log 2> /tmp/django-dev-error.log &'
-
-alias sync='python manage.py syncdb'
-
-alias she='python manage.py shell'
-
-# Utilities
-
-alias screen='screen -S abossy -t emacs'
-
-# Check Ubuntu version
-alias ubuntu_version='lsb_release -a'
-
-# Kill all instances of the django dev server
-alias kill_dj="ps aux | grep -v grep | grep runserver | awk '{ print $2 }' | xargs echo"
-
-# Remotely build dev server
-alias build_dev="ssh abossy@dev.topsicle.com 'cd ~/build && hg update && make build'"
-
 # reset hosts file on mac os x
 alias resethosts="dscacheutil -flushcache"
-
-# show me how to tab in the shell (i always forget!)
-alias help="echo 'tab: ctrl+v + ctrl+i'"
