@@ -1,6 +1,6 @@
 #!/bin/bash
 
-files=".bashrc .aliases_bash .vimrc .hgrc .gitconfig .screenrc .inputrc"
+files=".bashrc .aliases_bash .vimrc"
 
 cp -i $files ~/
 echo "Copied $files to $HOME directory."
