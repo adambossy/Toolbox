@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# dot-sync: sync dotfiles between $HOME and this repo
+# dot-sync: sync dotfiles between $HOME and this repo, with confirm-before-overwrite.
 # Tracks:
 #   ~/.vimrc
 #   ~/.bashrc
@@ -33,42 +33,106 @@ dot-sync — sync a handful of dotfiles between \$HOME and this git repo.
 
 Usage:
   dot-sync status|diff    Show differences (repo vs local)
-  dot-sync pull           Copy repo -> local (backup changed targets)
-  dot-sync push           Copy local -> repo (mkdir as needed), then auto-commit with ai-commit
+  dot-sync pull           Copy repo -> local (confirm before overwrite; backup if changed)
+  dot-sync push           Copy local -> repo (confirm before overwrite; backup if changed), then ai-commit + git push
 EOF
 }
 
 # -------------------------------------------------------------------
 # Helpers
 # -------------------------------------------------------------------
-log() { printf "[dot-sync] %s\n" "$*"; }
-backup_if_changed() {
-  local target="$1" src="$2"
-  if [[ -e "$target" ]] && ! cmp -s "$target" "$src"; then
-    local ts; ts="$(date +%Y%m%d-%H%M%S)"
-    cp -p "$target" "${target}.bak.${ts}"
-    log "Backed up: $target"
+log()  { printf "[dot-sync] %s\n" "$*"; }
+warn() { printf "[dot-sync:WARN] %s\n" "$*" >&2; }
+
+have_colordiff=false
+command -v colordiff >/dev/null 2>&1 && have_colordiff=true
+
+show_diff() {
+  # $1 = old (dest), $2 = new (src)
+  if [[ -e "$1" ]]; then
+    if $have_colordiff; then colordiff -u "$1" "$2" || true
+    else diff -u "$1" "$2" || true
+    fi
+  else
+    echo "--- $1 (missing)"
+    echo "+++ $2"
+    if $have_colordiff; then colordiff -u /dev/null "$2" || true
+    else diff -u /dev/null "$2" || true
+    fi
   fi
 }
+
+backup_if_changed() {
+  # $1 = path to back up
+  local target="$1"
+  if [[ -e "$target" ]]; then
+    local ts; ts="$(date +%Y%m%d-%H%M%S)"
+    cp -p "$target" "${target}.bak.${ts}"
+    log "Backed up: $target -> ${target}.bak.${ts}"
+  fi
+}
+
 ensure_parent() { mkdir -p "$(dirname "$1")"; }
+
+confirm_overwrite() {
+  # $1 = dest path, $2 = src path, $3 = label (for display)
+  local dest="$1" src="$2" label="$3"
+  if [[ -e "$dest" ]] && ! cmp -s "$dest" "$src"; then
+    echo "=== DIFF for $label ==="
+    show_diff "$dest" "$src"
+    read -r -p "Overwrite $dest with $src ? [y/N] " ans
+    case "${ans:-}" in
+      y|Y|yes|YES) return 0 ;;
+      *) echo "Skipped: $label"; return 1 ;;
+    esac
+  fi
+  # If dest doesn't exist or files are identical, no prompt needed
+  return 0
+}
+
+copy_with_confirm() {
+  # $1 = src, $2 = dest, $3 = label (e.g., .bashrc), $4 = post_copy_chmod (optional mode or empty)
+  local src="$1" dest="$2" label="$3" mode="${4:-}"
+  ensure_parent "$dest"
+
+  # If identical, do nothing.
+  if [[ -e "$dest" ]] && cmp -s "$dest" "$src"; then
+    log "No change: $label"
+    return 0
+  fi
+
+  # Confirm if we're about to overwrite an existing, different file
+  if ! confirm_overwrite "$dest" "$src" "$label"; then
+    return 0
+  fi
+
+  # Make backup (only if dest exists and differs or exists at all)
+  [[ -e "$dest" ]] && backup_if_changed "$dest"
+
+  # Copy and optionally chmod
+  cp -fp "$src" "$dest"
+  [[ -n "$mode" ]] && chmod "$mode" "$dest" || true
+  log "Copied: $label"
+}
 
 copy_repo_to_local() {
   local rel="$1"
   local src="$REPO_DIR/$rel" dst="$HOME_DIR/$rel"
   [[ -e "$src" ]] || { log "Repo missing $rel (skip)"; return; }
-  ensure_parent "$dst"
-  backup_if_changed "$dst" "$src"
-  cp -fp "$src" "$dst"
-  [[ "$rel" == .local/bin/* ]] && chmod +x "$dst"
-  log "Repo → Local: $rel"
+  # Executables in .local/bin get +x
+  local mode=""
+  [[ "$rel" == .local/bin/* ]] && mode="0755"
+  copy_with_confirm "$src" "$dst" "Repo → Local: $rel" "$mode"
 }
+
 copy_local_to_repo() {
   local rel="$1"
   local src="$HOME_DIR/$rel" dst="$REPO_DIR/$rel"
   [[ -e "$src" ]] || { log "Local missing $rel (skip)"; return; }
-  ensure_parent "$dst"
-  cp -fp "$src" "$dst"
-  log "Local → Repo: $rel"
+  # Preserve exec bit when syncing into repo
+  local mode=""
+  if [[ "$rel" == .local/bin/* && -x "$src" ]]; then mode="0755"; fi
+  copy_with_confirm "$src" "$dst" "Local → Repo: $rel" "$mode"
 }
 
 do_status() {
@@ -96,12 +160,40 @@ do_pull() { for rel in "${FILES[@]}"; do copy_repo_to_local "$rel"; done; }
 
 do_push() {
   for rel in "${FILES[@]}"; do copy_local_to_repo "$rel"; done
-  log "Push complete."
-  if [[ -x "$REPO_DIR/.local/bin/ai-commit" ]]; then
-    (cd "$REPO_DIR" && git add -A && "$REPO_DIR/.local/bin/ai-commit")
-    log "Auto-commit done using ai-commit"
+  log "Push copy complete."
+
+  # Auto-commit via repo's ai-commit, then push to remote
+  if command -v git >/dev/null 2>&1 && [[ -d "$REPO_DIR/.git" ]]; then
+    (
+      cd "$REPO_DIR"
+      # If nothing changed, bail early (avoid empty commit)
+      if git diff --quiet && git diff --cached --quiet; then
+        log "No repo changes to commit."
+      else
+        git add -A
+        if [[ -x "$REPO_DIR/.local/bin/ai-commit" ]]; then
+          "$REPO_DIR/.local/bin/ai-commit"
+          log "Committed using ai-commit."
+        else
+          warn "ai-commit not found or not executable; skipping commit."
+        fi
+      fi
+
+      # Push if a remote exists
+      if git remote get-url origin >/dev/null 2>&1; then
+        if git rev-parse --abbrev-ref --symbolic-full-name @{u} >/dev/null 2>&1; then
+          git push
+        else
+          cur_branch="$(git rev-parse --abbrev-ref HEAD)"
+          git push -u origin "$cur_branch"
+        fi
+        log "Pushed to remote."
+      else
+        warn "No 'origin' remote configured; skipped git push."
+      fi
+    )
   else
-    log "ai-commit not found or not executable in repo; skipping commit."
+    warn "Not a git repo or git unavailable; skipped commit/push."
   fi
 }
 
@@ -117,3 +209,8 @@ case "$cmd" in
   *) echo "Unknown: $cmd" >&2; usage; exit 1;;
 esac
 
+# -------------------------------------------------------------------
+# PATH update so you can call dot-sync anywhere
+# -------------------------------------------------------------------
+pathappend() { case ":$PATH:" in *":$1:"*) ;; *) PATH="$PATH:$1";; esac }
+pathappend "$REPO_DIR"
