@@ -5,13 +5,12 @@
 
 # # ----- History -----
 HISTCONTROL=ignoredups:erasedups    # no duplicate entries
-HISTSIZE=10000                     # large in-memory history
-HISTFILESIZE=20000                 # large on-disk history
+HISTSIZE=10000                      # large in-memory history
+HISTFILESIZE=20000                  # large on-disk history
 shopt -s histappend                 # append history, don’t overwrite
 PROMPT_COMMAND="history -a; history -c; history -r; $PROMPT_COMMAND"
 
 # # ----- Safer defaults -----
-set -o noclobber    # prevent overwriting files with ">"
 set -o pipefail     # fail pipelines properly
 
 # ----- Prompt -----
