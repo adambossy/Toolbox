@@ -38,20 +38,5 @@
 	
 	# List aliases
 	list = "!git config -l | grep alias | cut -c 7-"
-
-	# AI commit
-	ai = "!~/.local/bin/ai-commit"
-	clean-rebase = "!~/.local/bin/git-clean-rebase"
-	clean-local-branches = "!~/.local/bin/git-clean-local-branches"
 [core]
- 	editor = vim
-[credential "https://github.com"]
-	helper = 
-	helper = !/opt/homebrew/bin/gh auth git-credential
-[credential "https://gist.github.com"]
-	helper = 
-	helper = !/opt/homebrew/bin/gh auth git-credential
-[push]
-	default = simple
-	forceWithLease = true
-
+	editor = vim
