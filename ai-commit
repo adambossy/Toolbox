@@ -1,0 +1,98 @@
+#!/bin/bash
+
+#==============================================================================
+# Generate a Commit Message, using an LLM!
+#==============================================================================
+#
+# Dependencies:
+# - git
+# - [`llm` CLI tool](https://llm.datasette.io/en/stable/)
+#
+# Description:
+# This script automates the process of generating meaningful Git commit messages
+# using an AI language model. It uses the 'llm' CLI tool to analyze the staged
+# changes (git diff) and produce a commit message that follows best practices.
+#
+# Key features:
+# - Generates commit messages based on staged changes
+# - Enforces commit message formatting rules (e.g., 50-char subject line)
+# - Removes code fences from the AI-generated output
+# - Opens the commit message in an editor for final review
+#
+# Usage:
+# Run this script instead of 'git commit' when you want an AI-assisted
+# commit message. The script will generate a message and open it in your
+# default Git editor for review before committing.
+#
+#==============================================================================
+
+set -euo pipefail
+
+# Function to check if required commands are available
+check_dependencies() {
+  local deps=("git" "llm")
+  for cmd in "${deps[@]}"; do
+    if ! command -v "$cmd" &>/dev/null; then
+      echo "Error: $cmd is not installed or not in PATH" >&2
+      exit 1
+    fi
+  done
+}
+
+# Function to generate a commit message using the llm CLI
+generate_commit_message() {
+  local diff
+  diff=$(git diff --cached)
+  if [ -z "$diff" ]; then
+    echo "Error: No staged changes found. Please stage your changes before running this script." >&2
+    exit 1
+  fi
+
+  local branch_name
+  branch_name=$(git branch --show-current || true)
+  if [ -z "$branch_name" ]; then
+    branch_name="(no branch)"
+  fi
+
+  echo "$diff" | llm -m "4o" "
+Your task is to write a short commit message subject based on the diff provided below.
+
+You are currently working on the '$branch_name' branch.
+
+The commit message you generate will be used with \`git commit -m\`.
+
+The commit message should start with a short and concise summary of the changes.
+You may optionally include a longer body, separated by a blank line from the summary.
+
+You must strictly obey the following rules:
+
+1. The summary must be AT MOST 50 characters long.
+2. The longer body is optional. Only include it if it is necessary.
+3. The body must wrap lines to fit within 72 characters.
+4. The summary should start with a capital letter and NOT end with a period.
+5. Use backticks (\`) to format code snippets.
+
+Below is a diff of all staged changes, coming from the command:
+\`\`\`
+git diff --cached
+\`\`\`
+
+Please generate a commit message for these changes, following the provided rules.
+Ensure the first line is AT MOST 50 characters long."
+}
+
+# Function to remove code fences from the llm output
+remove_code_fence() {
+  sed -e '/^```/d' -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//'
+}
+
+main() {
+  check_dependencies
+
+  local commit_message
+  commit_message=$(generate_commit_message | remove_code_fence)
+
+  git commit -e -m "$commit_message"
+}
+
+main "$@"

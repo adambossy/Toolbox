@@ -1,0 +1,55 @@
+#!/usr/bin/env bash
+# For each local branch except main/master:
+#  - if upstream exists -> git pull, then delete (-d)
+#  - if upstream gone   -> force delete (-D)
+#  - if no upstream     -> skip (keep local work)
+
+set -o pipefail
+
+# Determine default branch
+if git show-ref --verify --quiet refs/heads/main; then
+  DEFAULT_BRANCH="main"
+elif git show-ref --verify --quiet refs/heads/master; then
+  DEFAULT_BRANCH="master"
+else
+  echo "No 'main' or 'master' branch found." >&2
+  exit 1
+fi
+
+git fetch --all --prune
+
+for BR in $(git branch --format='%(refname:short)'); do
+  [ "$BR" = "$DEFAULT_BRANCH" ] && continue
+
+  echo "==> Processing '$BR'..."
+
+  # Determine upstream without needing to checkout
+  UPSTREAM_REF=$(git for-each-ref --format='%(upstream)' "refs/heads/$BR")
+  if [ -z "$UPSTREAM_REF" ]; then
+    UPSTREAM_STATUS="none"   # no upstream ever set
+  elif git show-ref --verify --quiet "$UPSTREAM_REF"; then
+    UPSTREAM_STATUS="ok"     # upstream exists
+  else
+    UPSTREAM_STATUS="gone"   # upstream was set but deleted
+  fi
+
+  case "$UPSTREAM_STATUS" in
+    ok)
+      echo "   (upstream exists, will pull and delete)"
+      git checkout "$BR" || { echo "   (checkout failed, skipping)"; continue; }
+      git pull --ff-only || echo "   (pull failed on '$BR')"
+      git checkout "$DEFAULT_BRANCH" || exit 1
+      git branch -d "$BR" || echo "   (not deleted: '$BR' isn't fully merged)"
+      ;;
+    gone)
+      echo "   (upstream gone, will force delete)"
+      git checkout "$DEFAULT_BRANCH" || exit 1
+      git branch -D "$BR" || echo "   (force delete failed for '$BR')"
+      ;;
+    none)
+      echo "   (no upstream configured; keeping branch '$BR')"
+      ;;
+  esac
+done
+
+echo "Done."
