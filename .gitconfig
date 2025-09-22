@@ -55,3 +55,5 @@
 	default = simple
 	forceWithLease = true
 
+[pager]
+	branch = false

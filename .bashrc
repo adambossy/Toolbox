@@ -91,7 +91,7 @@ extract () {
 }
 
 # Pager & man colors
-export LESS='-R --ignore-case --mouse --wheel-lines=3'
+export LESS='-R --ignore-case --wheel-lines=3'
 export LESSHISTFILE=-
 export MANPAGER="less"
 export MANWIDTH=999
