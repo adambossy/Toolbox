@@ -8,7 +8,8 @@ HISTCONTROL=ignoredups:erasedups    # no duplicate entries
 HISTSIZE=10000                      # large in-memory history
 HISTFILESIZE=20000                  # large on-disk history
 shopt -s histappend                 # append history, don’t overwrite
-PROMPT_COMMAND="history -a; history -c; history -r; $PROMPT_COMMAND"
+PROMPT_COMMAND="history -a; history -c; history -r${PROMPT_COMMAND:+; $PROMPT_COMMAND}"
+
 
 # # ----- Safer defaults -----
 set -o pipefail     # fail pipelines properly
@@ -111,8 +112,8 @@ pathmunge "$HOME/.local/bin"
 pathappend "/opt/homebrew/bin"
 
 # bun
-export bun_install="$home/.bun"
-pathappend "$bun_install/bin"
+export BUN_INSTALL="$HOME/.bun"
+pathappend "$BUN_INSTALL/bin"
 
 export PATH
 
