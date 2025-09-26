@@ -38,7 +38,7 @@ alias brc="source ~/.bashrc"
 
 # Safer 'rm' using macOS Trash (brew install trash)
 if command -v trash >/dev/null 2>&1; then
-  alias rm='trash -F'
+  alias rm='trash'
 else
   alias rm='rm -i'  # interactive confirm as a fallback
 fi

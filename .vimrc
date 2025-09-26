@@ -53,7 +53,7 @@ set splitright                 " vertical splits open right
 set timeoutlen=500             " shorter delay for mappings
 
 " ---------- Colors ----------
-colorscheme elflord             " set color scheme (try desert, elflord, evening, etc.)
+colorscheme lunaperche             " set color scheme (try desert, elflord, evening, etc.)
 
 " ---------- Mappings ----------
 let mapleader = ","            " set leader key to comma
