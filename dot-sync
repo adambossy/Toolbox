@@ -25,6 +25,7 @@ FILES=(
   ".local/bin/ai-commit"
   ".local/bin/git-clean-local-branches"
   ".local/bin/git-clean-rebase"
+  ".local/bin/convert-heics-to-jpgs"
 )
 
 usage() {
