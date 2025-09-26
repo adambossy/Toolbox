@@ -134,7 +134,7 @@ export NODE_ENV=development
 
 # Add toolbox to PATH
 pathappend() { case ":$PATH:" in *":$1:"*) ;; *) PATH="$PATH:$1";; esac }
-pathappend "$HOME/code/toolbox"
+pathappend "$HOME/code/dot-sync"
 
 echo "Sourced .bashrc."
 
