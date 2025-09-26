@@ -6,7 +6,7 @@ set -euo pipefail
 #   ~/.vimrc
 #   ~/.bashrc
 #   ~/.gitconfig
-#   ~/.local/bin/{ai-commit,git-clean-local-branches,git-clean-rebase}
+#   ~/.local/bin/{git-ai-commit,git-clean-local-branches,git-clean-rebase}
 
 # -------------------------------------------------------------------
 # Repo dir = directory containing this script
@@ -22,7 +22,7 @@ FILES=(
   ".vimrc"
   ".bashrc"
   ".gitconfig"
-  ".local/bin/ai-commit"
+  ".local/bin/git-ai-commit"
   ".local/bin/git-clean-local-branches"
   ".local/bin/git-clean-rebase"
   ".local/bin/convert-heics-to-jpgs"
@@ -35,7 +35,7 @@ dot-sync — sync a handful of dotfiles between \$HOME and this git repo.
 Usage:
   dot-sync status|diff    Show differences (repo vs local)
   dot-sync pull           Copy repo -> local (confirm before overwrite; backup if changed)
-  dot-sync push           Copy local -> repo (confirm before overwrite; backup if changed), then ai-commit + git push
+  dot-sync push           Copy local -> repo (confirm before overwrite; backup if changed), then git-ai-commit + git push
 EOF
 }
 
@@ -163,7 +163,7 @@ do_push() {
   for rel in "${FILES[@]}"; do copy_local_to_repo "$rel"; done
   log "Push copy complete."
 
-  # Auto-commit via repo's ai-commit, then push to remote
+  # Auto-commit via repo's git-ai-commit, then push to remote
   if command -v git >/dev/null 2>&1 && [[ -d "$REPO_DIR/.git" ]]; then
     (
       cd "$REPO_DIR"
@@ -172,11 +172,11 @@ do_push() {
         log "No repo changes to commit."
       else
         git add -A
-        if [[ -x "$REPO_DIR/.local/bin/ai-commit" ]]; then
-          "$REPO_DIR/.local/bin/ai-commit"
-          log "Committed using ai-commit."
+        if [[ -x "$REPO_DIR/.local/bin/git-ai-commit" ]]; then
+          "$REPO_DIR/.local/bin/git-ai-commit"
+          log "Committed using git-ai-commit."
         else
-          warn "ai-commit not found or not executable; skipping commit."
+          warn "git-ai-commit not found or not executable; skipping commit."
         fi
       fi
 
