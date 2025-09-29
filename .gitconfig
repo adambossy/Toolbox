@@ -40,7 +40,7 @@
 	list = "!git config -l | grep alias | cut -c 7-"
 
 	# AI commit
-	ai = "!~/.local/bin/ai-commit"
+	ai = "!~/.local/bin/git-ai-commit"
 	clean-rebase = "!~/.local/bin/git-clean-rebase"
 	clean-local-branches = "!~/.local/bin/git-clean-local-branches"
 [core]
