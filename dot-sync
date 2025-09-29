@@ -26,6 +26,7 @@ FILES=(
   ".local/bin/git-clean-local-branches"
   ".local/bin/git-clean-rebase"
   ".local/bin/convert-heics-to-jpgs"
+  "Library/Application Support/Amethyst/Layouts/centered-primary-columns.js"
 )
 
 usage() {
@@ -75,6 +76,27 @@ backup_if_changed() {
 
 ensure_parent() { mkdir -p "$(dirname "$1")"; }
 
+# Parse entry that may be either a simple relative path or a mapping in the
+# form: "local_path => repo_path". Prints "local|repo".
+split_entry() {
+  local entry="$1"
+  local local_rel repo_rel
+  if [[ "$entry" == *"=>"* ]]; then
+    local_rel="${entry%%=>*}"
+    repo_rel="${entry#*=>}"
+  else
+    local_rel="$entry"
+    # Implicit mapping: always map repo path to the basename of the local path
+    repo_rel="${local_rel##*/}"
+  fi
+  # trim leading/trailing whitespace on both sides
+  local_rel="${local_rel#${local_rel%%[![:space:]]*}}"
+  local_rel="${local_rel%${local_rel##*[![:space:]]}}"
+  repo_rel="${repo_rel#${repo_rel%%[![:space:]]*}}"
+  repo_rel="${repo_rel%${repo_rel##*[![:space:]]}}"
+  printf '%s|%s' "$local_rel" "$repo_rel"
+}
+
 confirm_overwrite() {
   # $1 = dest path, $2 = src path, $3 = label (for display)
   local dest="$1" src="$2" label="$3"
@@ -117,41 +139,47 @@ copy_with_confirm() {
 }
 
 copy_repo_to_local() {
-  local rel="$1"
-  local src="$REPO_DIR/$rel" dst="$HOME_DIR/$rel"
-  [[ -e "$src" ]] || { log "Repo missing $rel (skip)"; return; }
-  # Executables in .local/bin get +x
+  local entry="$1"
+  local pair; pair="$(split_entry "$entry")"
+  local local_rel="${pair%%|*}" repo_rel="${pair##*|}"
+  local src="$REPO_DIR/$repo_rel" dst="$HOME_DIR/$local_rel"
+  [[ -e "$src" ]] || { log "Repo missing $repo_rel (skip)"; return; }
+  # Executables in .local/bin get +x when copying to local
   local mode=""
-  [[ "$rel" == .local/bin/* ]] && mode="0755"
-  copy_with_confirm "$src" "$dst" "Repo → Local: $rel" "$mode"
+  [[ "$local_rel" == .local/bin/* ]] && mode="0755"
+  copy_with_confirm "$src" "$dst" "Repo → Local: $local_rel" "$mode"
 }
 
 copy_local_to_repo() {
-  local rel="$1"
-  local src="$HOME_DIR/$rel" dst="$REPO_DIR/$rel"
-  [[ -e "$src" ]] || { log "Local missing $rel (skip)"; return; }
-  # Preserve exec bit when syncing into repo
+  local entry="$1"
+  local pair; pair="$(split_entry "$entry")"
+  local local_rel="${pair%%|*}" repo_rel="${pair##*|}"
+  local src="$HOME_DIR/$local_rel" dst="$REPO_DIR/$repo_rel"
+  [[ -e "$src" ]] || { log "Local missing $local_rel (skip)"; return; }
+  # Preserve exec bit when syncing into repo for local executables
   local mode=""
-  if [[ "$rel" == .local/bin/* && -x "$src" ]]; then mode="0755"; fi
-  copy_with_confirm "$src" "$dst" "Local → Repo: $rel" "$mode"
+  if [[ "$local_rel" == .local/bin/* && -x "$src" ]]; then mode="0755"; fi
+  copy_with_confirm "$src" "$dst" "Local → Repo: $repo_rel" "$mode"
 }
 
 do_status() {
   local ret=0
-  for rel in "${FILES[@]}"; do
-    local l="$HOME_DIR/$rel" r="$REPO_DIR/$rel"
+  for entry in "${FILES[@]}"; do
+    local pair; pair="$(split_entry "$entry")"
+    local local_rel="${pair%%|*}" repo_rel="${pair##*|}"
+    local l="$HOME_DIR/$local_rel" r="$REPO_DIR/$repo_rel"
     if [[ -e "$l" && -e "$r" ]]; then
       if ! cmp -s "$l" "$r"; then
-        echo "diff -- $rel"
+        echo "diff -- $local_rel ↔ $repo_rel"
         diff -u "$r" "$l" || true
         ret=1
       fi
     elif [[ -e "$l" && ! -e "$r" ]]; then
-      echo "only-in-local: $rel"; ret=1
+      echo "only-in-local: $local_rel"; ret=1
     elif [[ ! -e "$l" && -e "$r" ]]; then
-      echo "only-in-repo:  $rel"; ret=1
+      echo "only-in-repo:  $repo_rel"; ret=1
     else
-      echo "missing-both:  $rel"
+      echo "missing-both:  $local_rel | $repo_rel"
     fi
   done
   return $ret
