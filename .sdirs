@@ -1,0 +1,8 @@
+export DIR_charlie="$HOME/code/charlie-labs/charlie"
+export DIR_evalsmic="$HOME/code/charlie-labs/charlie/packages/evals-mic"
+export DIR_coreaireviewer="$HOME/code/charlie-labs/charlie/packages/core-ai-reviewer"
+export DIR_panoply="$HOME/code/panoply"
+export DIR_charlieinterviews="$HOME/code/charlie-labs"
+export DIR_toolbox="$HOME/code/toolbox"
+export DIR_dotsync="$HOME/code/dot-sync"
+export DIR_amethystlayouts="$HOME/Library/Application Support/Amethyst/Layouts"

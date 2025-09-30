@@ -22,6 +22,7 @@ FILES=(
   ".vimrc"
   ".bashrc"
   ".gitconfig"
+  ".sdirs"
   ".local/bin/git-ai-commit"
   ".local/bin/git-clean-local-branches"
   ".local/bin/git-clean-rebase"
