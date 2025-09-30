@@ -18,8 +18,16 @@ fi
 
 git fetch --all --prune
 
+# Track the currently checked-out branch to avoid deleting it
+CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+
 for BR in $(git branch --format='%(refname:short)'); do
   [ "$BR" = "$DEFAULT_BRANCH" ] && continue
+  # Do not delete the branch the user is currently on
+  if [ "$BR" = "$CURRENT_BRANCH" ]; then
+    echo "==> Skipping current branch '$BR'."
+    continue
+  fi
 
   echo "==> Processing '$BR'..."
 
