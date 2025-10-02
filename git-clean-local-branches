@@ -60,4 +60,7 @@ for BR in $(git branch --format='%(refname:short)'); do
   esac
 done
 
+echo "Returning to original branch '$CURRENT_BRANCH'..."
+git checkout "$CURRENT_BRANCH" || exit 1
+
 echo "Done."
