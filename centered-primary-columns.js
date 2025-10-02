@@ -1,16 +1,17 @@
 function layout() {
-  // Tunables
-  const MIN_RATIO = 0.20; // smallest center width as fraction of screen
-  const MAX_RATIO = 0.80; // largest  center width as fraction of screen
+  // ---- Tunables -------------------------------------------------------------
+  const MIN_RATIO = 0.20; // minimum center width as fraction of screen
+  const MAX_RATIO = 0.80; // maximum center width as fraction of screen
   const STEP      = 0.05; // how much expand/shrink changes width
+  const START     = 0.40; // initial center width fraction
 
   return {
     name: "Centered Primary Columns",
 
     // Persisted state for this layout instance
     initialState: {
-      mainRatio: 0.40,   // center width starts at 40% of the screen
-      mainWindowID: null // which window is "primary" (falls back to windows[0])
+      mainRatio: START,
+      mainWindowID: null // which window is "primary"
     },
 
     /**
@@ -25,28 +26,17 @@ function layout() {
       const N = windows.length;
       if (N === 0) return frames;
 
-      // Pick primary:
-      // 1) use state.mainWindowID if present
-      // 2) otherwise prefer focused window
-      // 3) otherwise windows[0]
-      const focused = windows.find(w => w.isFocused);
+      // ---- Sticky primary: do NOT fall back to focused ----
       const primary =
         windows.find(w => w.id === state.mainWindowID) ||
         windows[0];
 
-      // Primary width & position (centered, full height)
-      const mainRatio = clamp(state.mainRatio ?? 0.40, MIN_RATIO, MAX_RATIO);
+      // Primary geometry (centered, full height)
+      const mainRatio = clamp(state.mainRatio ?? START, MIN_RATIO, MAX_RATIO);
       const mainW = Math.round(screenFrame.width * mainRatio);
       const mainX = Math.round(screenFrame.x + (screenFrame.width - mainW) / 2);
       const mainY = screenFrame.y;
       const mainH = screenFrame.height;
-
-      frames[primary.id] = {
-        x: mainX,
-        y: mainY,
-        width: mainW,
-        height: mainH
-      };
 
       // Side regions
       const leftRegion  = {
@@ -70,105 +60,109 @@ function layout() {
         if (idx % 2 === 0) leftIDs.push(w.id); else rightIDs.push(w.id);
       });
 
-      // Helper: lay out a side as equal-width full-height columns
-      const layoutSide = (ids, region, align = "left") => {
+      // ---- Clockwise order we want: left side (L→R), then primary, then right side (L→R)
+      // We insert frames in that order so swap-clockwise follows it.
+      const layoutSide = (ids, region) => {
         const k = ids.length;
         if (k === 0 || region.width <= 0) return;
         const colW = Math.floor(region.width / k);
         ids.forEach((id, i) => {
-          const colIndex = align === "left" ? i : i; // both sides fill left→right within their region
-          const x = region.x + colIndex * colW;
+          const x = region.x + i * colW;
           frames[id] = {
             x,
             y: region.y,
-            width: (i === k - 1) ? region.width - colW * (k - 1) : colW, // last column takes any remainder
+            width: (i === k - 1) ? region.width - colW * (k - 1) : colW, // last takes remainder
             height: region.height
           };
         });
       };
 
-      layoutSide(leftIDs,  leftRegion,  "left");
-      layoutSide(rightIDs, rightRegion, "left");
+      // Insert frames in the desired clockwise order:
+      // 1) Left side (L→R)
+      layoutSide(leftIDs,  leftRegion);
+      // 2) Primary (centered)
+      frames[primary.id] = {
+        x: mainX,
+        y: mainY,
+        width: mainW,
+        height: mainH
+      };
+      // 3) Right side (L→R)
+      layoutSide(rightIDs, rightRegion);
 
       return frames;
     },
 
     /**
-     * Respond to Amethyst-driven changes (commands, mouse resizes, focus, etc.)
-     * For commands: change = { type: "command", command: <string> }
-     * For focus change: change = { type: "focusedWindowChanged", windowId }
-     * For mouse resize of primary: change = { type: "resizedMain", delta }  // (supported in recent Amethyst)
+     * Keep primary sticky; repair if it disappears.
+     * Also allow (optional) reactions to swaps or hard resets.
      */
     updateWithChange: (change, state) => {
       if (!change || !change.type) return state;
 
-      // Track which window is "primary": swap-to-main should update this too
-      if (change.type === "focusedWindowChanged" && change.windowId) {
-        // Optional: do nothing — primary stays sticky until explicitly swapped.
+      // 1) NEVER change primary on focus/click
+      if (change.type === "focusedWindowChanged") {
         return state;
       }
 
+      // 2) Ensure we have a primary; repair it if the old one disappeared
       if (change.type === "windowsChanged" && Array.isArray(change.windows)) {
-        // If our primary disappeared, pick a new one deterministically.
-        if (state.mainWindowID && !change.windows.some(w => w.id === state.mainWindowID)) {
-          return { ...state, mainWindowID: change.windows[0]?.id ?? null };
+        const ids = change.windows.map(w => w.id);
+        if (!state.mainWindowID || !ids.includes(state.mainWindowID)) {
+          return { ...state, mainWindowID: ids[0] ?? null };
         }
         return state;
       }
 
+      // 3) If your Amethyst emits an event when swapping focused with main, honor it
       if (change.type === "swappedFocusedWithMain" && change.focusedWindowId) {
         return { ...state, mainWindowID: change.focusedWindowId };
       }
 
-      if (change.type === "command") {
-        switch (change.command) {
-          case "expandMain":
-            return { ...state, mainRatio: clamp((state.mainRatio ?? 0.40) + STEP, MIN_RATIO, MAX_RATIO) };
-          case "shrinkMain":
-            return { ...state, mainRatio: clamp((state.mainRatio ?? 0.40) - STEP, MIN_RATIO, MAX_RATIO) };
-          case "increaseMain":
-            return { ...state, mainRatio: clamp((state.mainRatio ?? 0.40) + STEP, MIN_RATIO, MAX_RATIO) };
-          case "decreaseMain":
-            return { ...state, mainRatio: clamp((state.mainRatio ?? 0.40) - STEP, MIN_RATIO, MAX_RATIO) };
-          default:
-            return state;
-        }
-      }
-
-      // Optional: react to mouse-driven center resize if your Amethyst version sends it
+      // 4) Optional: mouse-driven center resize (if provided by your Amethyst)
       if (change.type === "resizedMain" && typeof change.delta === "number") {
-        const ratioDelta = change.delta / (change.screenWidth || 1);
-        return { ...state, mainRatio: clamp((state.mainRatio ?? 0.40) + ratioDelta, MIN_RATIO, MAX_RATIO) };
+        const width = change.screenWidth || 1;
+        const ratioDelta = width ? (change.delta / width) : 0;
+        return { ...state, mainRatio: clamp((state.mainRatio ?? START) + ratioDelta, MIN_RATIO, MAX_RATIO) };
       }
 
-      // Hard reset support (Preferences → Hard reset layouts)
+      // 5) Hard reset
       if (change.type === "hardReset") {
-        return { mainRatio: 0.40, mainWindowID: null };
+        return { mainRatio: START, mainWindowID: null };
       }
 
       return state;
     },
 
-    // Declare which built-in commands we handle so your usual keybinds work.
-    // (Works per the custom-layouts docs; expand/shrink are the important ones here.)
+    // ---- Pane commands (wired to Amethyst keybinds) -------------------------
     commands: {
       expandMain: {
         description: "Widen the centered primary",
-        updateState: (state /*, focusedWindowID */) =>
-          ({ ...state, mainRatio: Math.min(MAX_RATIO, (state.mainRatio ?? 0.40) + STEP) })
+        updateState: (state /*, focusedId */) =>
+          ({ ...state, mainRatio: clamp((state.mainRatio ?? START) + STEP, MIN_RATIO, MAX_RATIO) })
       },
       shrinkMain: {
         description: "Narrow the centered primary",
-        updateState: (state /*, focusedWindowID */) =>
-          ({ ...state, mainRatio: Math.max(MIN_RATIO, (state.mainRatio ?? 0.40) - STEP) })
+        updateState: (state /*, focusedId */) =>
+          ({ ...state, mainRatio: clamp((state.mainRatio ?? START) - STEP, MIN_RATIO, MAX_RATIO) })
       },
-      // We always keep exactly one window as primary in this layout.
+      // We always keep exactly one primary; these are no-ops here.
       increaseMain: { description: "No-op", updateState: (s) => s },
       decreaseMain: { description: "No-op", updateState: (s) => s },
-      // You can bind this custom one in .amethyst.yml if you like:
-      // setFocusedAsMain: true
+
+      // Convenience: bind this if you want a manual way to choose the primary
+      setFocusedAsMain: {
+        description: "Make focused window the primary",
+        updateState: (state, focusedId) =>
+          focusedId ? ({ ...state, mainWindowID: focusedId }) : state
+      }
     }
+
+    // Note: If your Amethyst version supports an explicit "ordering" API for swap,
+    // it will use our insertion order above. If not, the insertion order of `frames`
+    // typically defines the clockwise sequence.
   };
 
+  // ---- Helpers --------------------------------------------------------------
   function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
 }
