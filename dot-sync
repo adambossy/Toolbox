@@ -28,6 +28,7 @@ FILES=(
   ".local/bin/git-clean-rebase"
   ".local/bin/convert-heics-to-jpgs"
   "Library/Application Support/Amethyst/Layouts/centered-primary-columns.js"
+  "Library/Application Support/Amethyst/Layouts/centered-twin-columns.js"
 )
 
 usage() {
